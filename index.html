@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Controle de Clientes</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f2f2f2; }
+        .tela { display: none; }
+        input, button, select { margin: 5px 0; padding: 8px; width: 100%; }
+        button { cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table, th, td { border: 1px solid black; padding: 8px; }
+    </style>
+</head>
+<body>
+
+    <!-- 🔐 TELA DE ACESSO -->
+    <div id="acesso" class="tela" style="display:block;">
+        <h2>Entrada</h2>
+        <input id="chave" placeholder="Digite a palavra-chave">
+        <button onclick="verificarChave()">Entrar</button>
+    </div>
+
+    <!-- 🔧 MENU -->
+    <div id="menu" class="tela">
+        <h2>Menu</h2>
+        <button onclick="abrirTela('cadastro')">Cadastrar Cliente</button>
+        <button onclick="abrirTela('listagem')">Listar Clientes</button>
+        <button onclick="abrirTela('pagamento')">Registrar Pagamento</button>
+    </div>
+
+    <!-- 📝 CADASTRAR -->
+    <div id="cadastro" class="tela">
+        <h2>Cadastrar Cliente</h2>
+        <input id="nome" placeholder="Nome do cliente">
+        <input id="vencimento" placeholder="Data de vencimento (dd/mm/aaaa)">
+        <input id="valor" type="number" placeholder="Valor total (R$)">
+        <button onclick="salvarCliente()">Salvar</button>
+        <button onclick="abrirTela('menu')">Voltar</button>
+    </div>
+
+    <!-- 📋 LISTAGEM -->
+    <div id="listagem" class="tela">
+        <h2>Clientes</h2>
+        <table id="tabela"></table>
+        <button onclick="abrirTela('menu')">Voltar</button>
+    </div>
+
+    <!-- 💰 PAGAMENTO -->
+    <div id="pagamento" class="tela">
+        <h2>Registrar Pagamento</h2>
+
+        <select id="clientePag" onchange="atualizarValorParcela()"></select>
+
+        <h3>Forma de pagamento:</h3>
+        <select id="tipoPag" onchange="toggleParcelas()">
+            <option value="avista">À vista</option>
+            <option value="parcelado">Parcelado</option>
+        </select>
+
+        <div id="areaParcelas" style="display:none;">
+            <h4>Número de parcelas:</h4>
+            <select id="qtdParcelas" onchange="atualizarValorParcela()">
+                <option>2</option>
+                <option>3</option>
+                <option>4</option>
+                <option>5</option>
+                <option>6</option>
+                <option>7</option>
+                <option>8</option>
+                <option>9</option>
+                <option>10</option>
+                <option>11</option>
+                <option>12</option>
+            </select>
+
+            <p id="valorParcelasLabel"></p>
+        </div>
+
+        <input id="valorPag" type="number" placeholder="Valor recebido (R$)">
+        <button onclick="registrarPagamento()">Salvar Pagamento</button>
+        <button onclick="abrirTela('menu')">Voltar</button>
+    </div>
+
+<script>
+// ⭐ Palavra-chave
+const CHAVE_CORRETA = "MARCENARIAMOVEISSANTOS";
+
+// ============================
+// 🔐 ACESSO
+// ============================
+function verificarChave() {
+    let chave = document.getElementById("chave").value;
+    if (chave === CHAVE_CORRETA) {
+        abrirTela("menu");
+    } else {
+        alert("Palavra-chave incorreta!");
+    }
+}
+
+// ============================
+// 🔧 NAVEGAÇÃO ENTRE TELAS
+// ============================
+function abrirTela(id) {
+    document.querySelectorAll(".tela").forEach(t => t.style.display = "none");
+    document.getElementById(id).style.display = "block";
+
+    if (id === "listagem" || id === "pagamento") carregarClientes();
+}
+
+// ============================
+// 📝 CADASTRAR CLIENTE
+// ============================
+function salvarCliente() {
+    let nome = document.getElementById("nome").value.trim();
+    let venc = document.getElementById("vencimento").value.trim();
+    let valor = parseFloat(document.getElementById("valor").value);
+
+    if (!nome || !venc || isNaN(valor)) {
+        alert("Preencha todos os campos corretamente!");
+        return;
+    }
+
+    let clientes = JSON.parse(localStorage.getItem("clientes") || "[]");
+
+    clientes.push({
+        nome: nome,
+        vencimento: venc,
+        valor_total: valor,
+        valor_pago: 0
+    });
+
+    localStorage.setItem("clientes", JSON.stringify(clientes));
+    alert("Cliente cadastrado!");
+    document.getElementById("nome").value = "";
+    document.getElementById("vencimento").value = "";
+    document.getElementById("valor").value = "";
+}
+
+// ============================
+// 📋 LISTAR CLIENTES
+// ============================
+function carregarClientes() {
+    let clientes = JSON.parse(localStorage.getItem("clientes") || "[]");
+    window.ultimaLista = clientes;
+
+    // tabela
+    let tabela = "<tr><th>Nome</th><th>Vencimento</th><th>Total</th><th>Pago</th><th>Restante</th></tr>";
+    clientes.forEach(c => {
+        tabela += `<tr>
+            <td>${c.nome}</td>
+            <td>${c.vencimento}</td>
+            <td>R$ ${c.valor_total.toFixed(2)}</td>
+            <td>R$ ${c.valor_pago.toFixed(2)}</td>
+            <td>R$ ${(c.valor_total - c.valor_pago).toFixed(2)}</td>
+        </tr>`;
+    });
+    document.getElementById("tabela").innerHTML = tabela;
+
+    // select para pagamento
+    let select = document.getElementById("clientePag");
+    select.innerHTML = "";
+    clientes.forEach((c,i) => {
+        select.innerHTML += `<option value="${i}">${c.nome}</option>`;
+    });
+
+    atualizarValorParcela();
+}
+
+// ============================
+// 💰 PAGAMENTO PARCELADO
+// ============================
+function toggleParcelas() {
+    let tipo = document.getElementById("tipoPag").value;
+    document.getElementById("areaParcelas").style.display =
+        tipo === "parcelado" ? "block" : "none";
+    atualizarValorParcela();
+}
+
+function atualizarValorParcela() {
+    let clientes = JSON.parse(localStorage.getItem("clientes") || "[]");
+    if (!clientes.length) return;
+
+    let index = document.getElementById("clientePag").value;
+    let cliente = clientes[index];
+    if (!cliente) return;
+
+    let tipo = document.getElementById("tipoPag").value;
+    if (tipo === "parcelado") {
+        let qtd = parseInt(document.getElementById("qtdParcelas").value);
+        let restante = cliente.valor_total - cliente.valor_pago;
+        let valorParcela = restante / qtd;
+        document.getElementById("valorParcelasLabel").innerHTML =
+            `Cada parcela: R$ ${valorParcela.toFixed(2)}`;
+    } else {
+        document.getElementById("valorParcelasLabel").innerHTML = "";
+    }
+}
+
+function registrarPagamento() {
+    let clientes = JSON.parse(localStorage.getItem("clientes") || "[]");
+    if (!clientes.length) return;
+
+    let index = document.getElementById("clientePag").value;
+    let cliente = clientes[index];
+    let tipo = document.getElementById("tipoPag").value;
+
+    let valor = 0;
+    if (tipo === "parcelado") {
+        let qtd = parseInt(document.getElementById("qtdParcelas").value);
+        let restante = cliente.valor_total - cliente.valor_pago;
+        valor = restante / qtd;
+        alert(`Registrando parcela de R$ ${valor.toFixed(2)}`);
+    } else {
+        valor = parseFloat(document.getElementById("valorPag").value);
+        if (isNaN(valor)) {
+            alert("Digite um valor válido!");
+            return;
+        }
+    }
+
+    cliente.valor_pago += valor;
+    if (cliente.valor_pago > cliente.valor_total) cliente.valor_pago = cliente.valor_total;
+
+    clientes[index] = cliente;
+    localStorage.setItem("clientes", JSON.stringify(clientes));
+    alert("Pagamento registrado!");
+    document.getElementById("valorPag").value = "";
+    carregarClientes();
+}
+</script>
+
+</body>
+</html>
